@@ -1,4 +1,14 @@
 services:
+  ubuntu22-arm64:
+    build:
+      context: .
+      dockerfile: Dockerfile_ubuntu22_arm64
+    platform: linux/arm64
+    volumes:
+      - ../..:/TeamTalk5:rw,z
+    user: root
+    working_dir: /TeamTalk5
+
   ubuntu24:
     build:
       context: .

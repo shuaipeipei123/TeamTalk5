@@ -1,0 +1,105 @@
+name: Build Ubuntu 22.04 ARM64 Server
+
+on:
+  # 手动触发（推荐）
+  workflow_dispatch:
+  # Push 时自动触发（可选）
+  # push:
+  #   branches: [ "master" ]
+
+jobs:
+  build-arm64:
+    # GitHub 免费提供的 ARM64 原生 runner（公开仓库免费）
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          autoconf \
+          cmake \
+          g++ \
+          git \
+          libssl-dev \
+          libtool \
+          make \
+          ninja-build \
+          pkg-config \
+          wget \
+          xz-utils \
+          zlib1g-dev
+
+    - name: Build TeamTalk Server (ARM64 native)
+      working-directory: ${{ github.workspace }}
+      run: |
+        source env.sh
+        # 只编译服务器，禁用所有客户端/编解码/音视频功能
+        make -C Build CMAKE_EXTRA="-G Ninja \
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+          -DTOOLCHAIN_OPENSSL=OFF \
+          -DTOOLCHAIN_ZLIB=OFF \
+          -DTOOLCHAIN_LIBVPX=OFF \
+          -DTOOLCHAIN_FFMPEG=OFF \
+          -DTOOLCHAIN_OGG=OFF \
+          -DTOOLCHAIN_OPUS=OFF \
+          -DTOOLCHAIN_PORTAUDIO=OFF \
+          -DTOOLCHAIN_SPEEX=OFF \
+          -DTOOLCHAIN_SPEEXDSP=OFF \
+          -DTOOLCHAIN_CATCH2=OFF \
+          -DBUILD_TEAMTALK_CLIENTS=OFF \
+          -DBUILD_TEAMTALK_DOCUMENTATION=OFF \
+          -DBUILD_TEAMTALK_LIBRARIES=OFF \
+          -DBUILD_TEAMTALK_LIBRARY_DLL=OFF \
+          -DBUILD_TEAMTALK_LIBRARY_DLLPRO=OFF \
+          -DBUILD_TEAMTALK_LIBRARY_LIB=OFF \
+          -DBUILD_TEAMTALK_LIBRARY_LIBPRO=OFF \
+          -DBUILD_TEAMTALK_SERVER_SRVEXE=ON \
+          -DBUILD_TEAMTALK_SERVER_SRVEXEPRO=ON \
+          -DBUILD_TEAMTALK_LIBRARY_UNITTEST_CATCH2=OFF \
+          -DFEATURE_WEBRTC=OFF \
+          -DFEATURE_FFMPEG=OFF \
+          -DFEATURE_PORTAUDIO=OFF \
+          -DFEATURE_V4L2=OFF \
+          -DFEATURE_LIBVPX=OFF \
+          -DFEATURE_OGG=OFF \
+          -DFEATURE_OPUS=OFF \
+          -DFEATURE_OPUSTOOLS=OFF \
+          -DFEATURE_SPEEX=OFF \
+          -DFEATURE_SPEEXDSP=OFF" \
+          BUILDDIR=build-release-ubuntu22-arm64 \
+          buildlib
+
+    - name: Verify binary architecture
+      run: |
+        echo "=== tt5srv ==="
+        file Server/tt5srv
+        echo "=== tt5prosrv ==="
+        file Server/tt5prosrv
+        echo "=== ldd ==="
+        ldd Server/tt5srv || true
+
+    - name: Package server binaries
+      run: |
+        mkdir -p artifact
+        cp Server/tt5srv Server/tt5prosrv artifact/
+        # 复制运行时需要的配置文件模板
+        cp Library/TeamTalkLib/test/tt5srv.xml_template artifact/ 2>/dev/null || true
+        cp Library/TeamTalkLib/test/tt5prosrv.xml_template artifact/ 2>/dev/null || true
+        # 打包
+        cd artifact
+        tar czf teamtalk5-server-ubuntu22-arm64.tar.gz *
+        cd ..
+        cp artifact/teamtalk5-server-ubuntu22-arm64.tar.gz .
+
+    - name: Upload server binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: teamtalk5-server-ubuntu22-arm64
+        path: teamtalk5-server-ubuntu22-arm64.tar.gz
+        retention-days: 30
