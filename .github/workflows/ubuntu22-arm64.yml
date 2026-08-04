@@ -1,16 +1,12 @@
 name: Build Ubuntu 22.04 ARM64 Server
 
 on:
-  # 手动触发（推荐）
   workflow_dispatch:
-  # Push 时自动触发（可选）
-  # push:
-  #   branches: [ "master" ]
 
 jobs:
   build-arm64:
-    # GitHub 免费提供的 ARM64 原生 runner（公开仓库免费）
-    runs-on: ubuntu-22.04-arm
+    # 用 x86_64 runner 交叉编译 ARM64（x86_64 runner 秒分配）
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout
@@ -18,29 +14,49 @@ jobs:
       with:
         submodules: true
 
-    - name: Install build dependencies
+    - name: Setup ARM64 cross-compilation environment
       run: |
+        # ARM64 架构支持（用于安装 ARM64 系统库）
+        sudo dpkg --add-architecture arm64
         sudo apt-get update
+
+        # 交叉编译器 + 构建工具
         sudo apt-get install -y \
           autoconf \
           cmake \
-          g++ \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
           git \
-          libssl-dev \
           libtool \
           make \
           ninja-build \
           pkg-config \
           wget \
-          xz-utils \
-          zlib1g-dev
+          xz-utils
 
-    - name: Build TeamTalk Server (ARM64 native)
+        # ARM64 系统库（因为我们是交叉编译 + TOOLCHAIN_OPENSSL=OFF/ZLIB=OFF）
+        sudo apt-get install -y \
+          libssl-dev:arm64 \
+          zlib1g-dev:arm64
+
+    - name: Build TeamTalk Server (cross-compile to ARM64)
       working-directory: ${{ github.workspace }}
       run: |
         source env.sh
-        # 只编译服务器，禁用所有客户端/编解码/音视频功能
+        
+        # 设置交叉编译器环境变量，ExternalProject (ACE 等) 会继承这些变量
+        export CC=aarch64-linux-gnu-gcc
+        export CXX=aarch64-linux-gnu-g++
+        export AR=aarch64-linux-gnu-ar
+        export RANLIB=aarch64-linux-gnu-ranlib
+        export LD=aarch64-linux-gnu-ld
+        export STRIP=aarch64-linux-gnu-strip
+
         make -C Build CMAKE_EXTRA="-G Ninja \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
           -DTOOLCHAIN_OPENSSL=OFF \
           -DTOOLCHAIN_ZLIB=OFF \
@@ -84,18 +100,17 @@ jobs:
         file Server/tt5srv
         echo "=== tt5prosrv ==="
         file Server/tt5prosrv
-        echo "=== ldd ==="
-        ldd Server/tt5srv || true
+        echo "=== readelf ==="
+        aarch64-linux-gnu-readelf -h Server/tt5srv | grep -E "Class|Machine|Entry"
 
     - name: Package server binaries
       run: |
         mkdir -p artifact
         cp Server/tt5srv Server/tt5prosrv artifact/
-        # 复制运行时需要的配置文件模板
         cp Library/TeamTalkLib/test/tt5srv.xml_template artifact/ 2>/dev/null || true
         cp Library/TeamTalkLib/test/tt5prosrv.xml_template artifact/ 2>/dev/null || true
-        # 打包
         cd artifact
+        aarch64-linux-gnu-strip tt5srv tt5prosrv
         tar czf teamtalk5-server-ubuntu22-arm64.tar.gz *
         cd ..
         cp artifact/teamtalk5-server-ubuntu22-arm64.tar.gz .
