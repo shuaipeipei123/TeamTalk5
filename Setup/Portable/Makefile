@@ -66,6 +66,12 @@ ubuntu26:
 rasp:
 	make TT5DIST=teamtalk-$(VERSION)-raspios12-arm64 linux
 
+ubuntu22-arm64:
+	make TT5DIST=teamtalk-$(VERSION)-ubuntu22-arm64 linux
+
+ubuntu22-arm64pro:
+	$(MAKE) TT5DIST=teamtalkpro-$(VERSION)-ubuntu22-arm64 linuxpro
+
 linux:
 	$(eval OUTDIR=$(OUTPUT_DEST)/$(TT5DIST))
 	rm -rf $(OUTDIR)

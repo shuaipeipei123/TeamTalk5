@@ -5,8 +5,8 @@ on:
 
 jobs:
   build-arm64:
-    # 用 x86_64 runner 交叉编译 ARM64（x86_64 runner 秒分配）
-    runs-on: ubuntu-22.04
+    # ARM64 原生 runner（上游 CI 已禁用，不会排队）
+    runs-on: ubuntu-22.04-arm
 
     steps:
     - name: Checkout
@@ -14,18 +14,13 @@ jobs:
       with:
         submodules: true
 
-    - name: Setup ARM64 cross-compilation environment
+    - name: Install build dependencies
       run: |
-        # ARM64 架构支持（用于安装 ARM64 系统库）
-        sudo dpkg --add-architecture arm64
         sudo apt-get update
-
-        # 交叉编译器 + 构建工具
         sudo apt-get install -y \
           autoconf \
           cmake \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
+          g++ \
           git \
           libtool \
           make \
@@ -34,29 +29,11 @@ jobs:
           wget \
           xz-utils
 
-        # ARM64 系统库（因为我们是交叉编译 + TOOLCHAIN_OPENSSL=OFF/ZLIB=OFF）
-        sudo apt-get install -y \
-          libssl-dev:arm64 \
-          zlib1g-dev:arm64
-
-    - name: Build TeamTalk Server (cross-compile to ARM64)
+    - name: Build TeamTalk Server
       working-directory: ${{ github.workspace }}
       run: |
         source env.sh
-        
-        # 设置交叉编译器环境变量，ExternalProject (ACE 等) 会继承这些变量
-        export CC=aarch64-linux-gnu-gcc
-        export CXX=aarch64-linux-gnu-g++
-        export AR=aarch64-linux-gnu-ar
-        export RANLIB=aarch64-linux-gnu-ranlib
-        export LD=aarch64-linux-gnu-ld
-        export STRIP=aarch64-linux-gnu-strip
-
         make -C Build CMAKE_EXTRA="-G Ninja \
-          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
-          -DCMAKE_SYSTEM_NAME=Linux \
-          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
           -DTOOLCHAIN_OPENSSL=OFF \
           -DTOOLCHAIN_ZLIB=OFF \
@@ -101,7 +78,7 @@ jobs:
         echo "=== tt5prosrv ==="
         file Server/tt5prosrv
         echo "=== readelf ==="
-        aarch64-linux-gnu-readelf -h Server/tt5srv | grep -E "Class|Machine|Entry"
+        readelf -h Server/tt5srv | grep -E "Class|Machine|Entry"
 
     - name: Package server binaries
       run: |
@@ -110,7 +87,7 @@ jobs:
         cp Library/TeamTalkLib/test/tt5srv.xml_template artifact/ 2>/dev/null || true
         cp Library/TeamTalkLib/test/tt5prosrv.xml_template artifact/ 2>/dev/null || true
         cd artifact
-        aarch64-linux-gnu-strip tt5srv tt5prosrv
+        strip tt5srv tt5prosrv
         tar czf teamtalk5-server-ubuntu22-arm64.tar.gz *
         cd ..
         cp artifact/teamtalk5-server-ubuntu22-arm64.tar.gz .
