@@ -27,7 +27,11 @@ jobs:
           ninja-build \
           pkg-config \
           wget \
-          xz-utils
+          xz-utils \
+          libspeex-dev \
+          libspeexdsp-dev \
+          libopus-dev \
+          libogg-dev
 
     - name: Build TeamTalk Server
       working-directory: ${{ github.workspace }}
