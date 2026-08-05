@@ -81,6 +81,10 @@ jobs:
         file Server/tt5srv
         echo "=== tt5prosrv ==="
         file Server/tt5prosrv
+        echo "=== libTeamTalk5.so ==="
+        file Library/TeamTalk_DLL/libTeamTalk5.so
+        echo "=== libTeamTalk5Pro.so ==="
+        file Library/TeamTalk_DLL/libTeamTalk5Pro.so
         echo "=== readelf ==="
         readelf -h Server/tt5srv | grep -E "Class|Machine|Entry"
 
@@ -88,10 +92,12 @@ jobs:
       run: |
         mkdir -p artifact
         cp Server/tt5srv Server/tt5prosrv artifact/
+        cp Library/TeamTalk_DLL/libTeamTalk5.so artifact/
+        cp Library/TeamTalk_DLL/libTeamTalk5Pro.so artifact/
         cp Library/TeamTalkLib/test/tt5srv.xml_template artifact/ 2>/dev/null || true
         cp Library/TeamTalkLib/test/tt5prosrv.xml_template artifact/ 2>/dev/null || true
         cd artifact
-        strip tt5srv tt5prosrv
+        strip tt5srv tt5prosrv libTeamTalk5.so libTeamTalk5Pro.so
         tar czf teamtalk5-server-ubuntu22-arm64.tar.gz *
         cd ..
         cp artifact/teamtalk5-server-ubuntu22-arm64.tar.gz .
