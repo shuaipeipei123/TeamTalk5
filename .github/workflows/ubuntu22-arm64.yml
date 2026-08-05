@@ -1,0 +1,81 @@
+name: Build Ubuntu 22.04 ARM64 Server v5.21
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          autoconf \
+          cmake \
+          g++ \
+          git \
+          libtool \
+          make \
+          ninja-build \
+          pkg-config \
+          wget \
+          xz-utils
+
+    - name: Build TeamTalk Server
+      working-directory: ${{ github.workspace }}
+      run: |
+        source env.sh
+        make -C Build \
+          BUILDDIR=build-release-ubuntu22-arm64 \
+          CMAKE_EXTRA="-G Ninja \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DTOOLCHAIN_OPENSSL=OFF \
+            -DTOOLCHAIN_ZLIB=OFF \
+            -DTOOLCHAIN_CATCH2=OFF \
+            -DBUILD_TEAMTALK_CLIENTS=OFF \
+            -DBUILD_TEAMTALK_LIBRARIES=OFF \
+            -DBUILD_TEAMTALK_DOCUMENTATION=OFF \
+            -DBUILD_TEAMTALK_SERVER_SRVEXE=ON \
+            -DBUILD_TEAMTALK_SERVER_SRVEXEPRO=ON \
+            -DBUILD_TEAMTALK_LIBRARY_DLL=ON \
+            -DBUILD_TEAMTALK_LIBRARY_DLLPRO=ON" \
+          generic
+
+    - name: Verify binary architecture
+      run: |
+        echo "=== tt5srv ==="
+        file Server/tt5srv
+        echo "=== tt5prosrv ==="
+        file Server/tt5prosrv
+        echo "=== libTeamTalk5.so ==="
+        file Library/TeamTalk_DLL/libTeamTalk5.so
+        echo "=== libTeamTalk5Pro.so ==="
+        file Library/TeamTalk_DLL/libTeamTalk5Pro.so
+        echo "=== readelf ==="
+        readelf -h Server/tt5srv | grep -E "Class|Machine|Entry"
+
+    - name: Package binaries
+      run: |
+        mkdir -p artifact
+        cp Server/tt5srv Server/tt5prosrv artifact/
+        cp Library/TeamTalk_DLL/libTeamTalk5.so artifact/
+        cp Library/TeamTalk_DLL/libTeamTalk5Pro.so artifact/
+        cd artifact
+        strip tt5srv tt5prosrv libTeamTalk5.so libTeamTalk5Pro.so
+        tar czf teamtalk5-v5.21-server-ubuntu22-arm64.tar.gz *
+        cd ..
+        cp artifact/teamtalk5-v5.21-server-ubuntu22-arm64.tar.gz .
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: teamtalk5-v5.21-server-ubuntu22-arm64
+        path: teamtalk5-v5.21-server-ubuntu22-arm64.tar.gz
+        retention-days: 30
