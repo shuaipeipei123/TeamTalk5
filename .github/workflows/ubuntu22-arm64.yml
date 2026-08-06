@@ -28,7 +28,8 @@ jobs:
           wget \
           xz-utils \
           libasound2-dev \
-          libpulse-dev
+          libpulse-dev \
+          libbz2-dev
 
     - name: Build TeamTalk Server
       working-directory: ${{ github.workspace }}
